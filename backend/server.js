@@ -1,63 +1,116 @@
+// 1️⃣ IMPORTS
 const express = require("express");
-const router = express.Router();
+const cors = require("cors");
+const helmet = require("helmet");
 const validator = require("validator");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const logger = require("./logger");
 
+// 2️⃣ CREATE APP
+const app = express();
+
+// 3️⃣ MIDDLEWARE
+app.use(express.json());
+app.use(helmet());
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const isLocalhost = /^http:\/\/localhost:\d+$/.test(origin);
+      if (isLocalhost) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    }
+  })
+);
+
+// 4️⃣ USERS STORAGE
 let users = [];
 
+// =======================
 // REGISTER
-router.post("/register", async (req, res) => {
-  let { email, password } = req.body;
+// =======================
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    let { email, password } = req.body || {};
 
-  logger.info(`Register attempt: ${email}`);
+    logger.info(`Register attempt: ${email}`);
 
-  email = validator.escape(email);
-  password = validator.escape(password);
+    if (typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({ msg: "Email and password are required" });
+    }
 
-  if (!validator.isEmail(email)) {
-    return res.status(400).json({ msg: "Invalid Email" });
+    email = validator.escape(email);
+    password = validator.escape(password);
+
+    if (!validator.isEmail(email)) {
+      return res.status(400).json({ msg: "Invalid Email" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ msg: "Password must be 6+ chars" });
+    }
+
+    if (users.find((u) => u.email === email)) {
+      return res.status(400).json({ msg: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    users.push({ email, password: hashedPassword });
+
+    res.json({ msg: "Registered successfully" });
+  } catch (error) {
+    logger.error(`Register error: ${error.message}`);
+    res.status(500).json({ msg: "Internal server error" });
   }
-
-  if (password.length < 6) {
-    return res.status(400).json({ msg: "Password must be 6+ chars" });
-  }
-
-  if (users.find((u) => u.email === email)) {
-    return res.status(400).json({ msg: "User already exists" });
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  users.push({ email, password: hashedPassword });
-
-  res.json({ msg: "Registered successfully" });
 });
 
+// =======================
 // LOGIN
-router.post("/login", async (req, res) => {
-  let { email, password } = req.body;
+// =======================
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    let { email, password } = req.body || {};
 
-  logger.info(`Login attempt: ${email}`);
+    logger.info(`Login attempt: ${email}`);
 
-  email = validator.escape(email);
+    if (typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({ msg: "Email and password are required" });
+    }
 
-  const user = users.find((u) => u.email === email);
+    email = validator.escape(email);
 
-  if (!user) {
-    return res.status(400).json({ msg: "User not found" });
+    const user = users.find((u) => u.email === email);
+
+    if (!user) {
+      return res.status(400).json({ msg: "User not found" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({ msg: "Invalid credentials" });
+    }
+
+    const token = jwt.sign({ email }, "secret-key", { expiresIn: "1h" });
+
+    res.json({ token });
+  } catch (error) {
+    logger.error(`Login error: ${error.message}`);
+    res.status(500).json({ msg: "Internal server error" });
   }
-
-  const isMatch = await bcrypt.compare(password, user.password);
-
-  if (!isMatch) {
-    return res.status(400).json({ msg: "Invalid credentials" });
-  }
-
-  const token = jwt.sign({ email }, "secret-key", { expiresIn: "1h" });
-
-  res.json({ token });
 });
 
-module.exports = router;
+// =======================
+// START SERVER
+// =======================
+app.listen(5000, () => {
+  console.log("Server running on port 5000");
+});

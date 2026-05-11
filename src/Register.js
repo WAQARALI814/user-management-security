@@ -1,12 +1,14 @@
 import { useState } from "react";
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const register = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/auth/register", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -14,12 +16,17 @@ function Register() {
         body: JSON.stringify({ email, password })
       });
 
-      const data = await res.json();
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (parseError) {
+        data = { msg: "Unexpected server response" };
+      }
 
-      alert(data.msg);
+      alert(data.msg || "Registration failed");
 
     } catch (err) {
-      alert("Server error");
+      alert(`Server error: ${err.message}`);
     }
   };
 

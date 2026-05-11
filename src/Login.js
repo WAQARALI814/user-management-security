@@ -1,12 +1,14 @@
 import { useState } from "react";
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
+
 function Login({ setUser }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const login = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -14,10 +16,15 @@ function Login({ setUser }) {
         body: JSON.stringify({ email, password })
       });
 
-      const data = await res.json();
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (parseError) {
+        data = { msg: "Unexpected server response" };
+      }
 
       if (!res.ok) {
-        alert(data.msg);
+        alert(data.msg || "Login failed");
         return;
       }
 
@@ -27,7 +34,7 @@ function Login({ setUser }) {
       alert("Login successful");
 
     } catch (err) {
-      alert("Server error");
+      alert(`Server error: ${err.message}`);
     }
   };
 
