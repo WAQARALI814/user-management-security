@@ -8,10 +8,18 @@ function Register() {
 
   const register = async () => {
     try {
+      const csrfRes = await fetch(`${API_BASE_URL}/api/csrf-token`, {
+        method: "GET",
+        credentials: "include"
+      });
+      const csrfData = await csrfRes.json();
+
       const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: "POST",
+        credentials: "include",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrfData.csrfToken
         },
         body: JSON.stringify({ email, password })
       });

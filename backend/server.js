@@ -1,6 +1,8 @@
 // 1️⃣ IMPORTS
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
+const csurf = require("csurf");
 const helmet = require("helmet");
 const validator = require("validator");
 const bcrypt = require("bcrypt");
@@ -13,6 +15,7 @@ const app = express();
 // 3️⃣ MIDDLEWARE
 app.use(express.json());
 app.use(helmet());
+app.use(cookieParser());
 app.use(
   cors({
     origin(origin, callback) {
@@ -26,17 +29,27 @@ app.use(
       }
 
       return callback(new Error("Not allowed by CORS"));
-    }
+    },
+    credentials: true
   })
 );
+
+const csrfProtection = csurf({ cookie: true });
 
 // 4️⃣ USERS STORAGE
 let users = [];
 
 // =======================
+// CSRF TOKEN
+// =======================
+app.get("/api/csrf-token", csrfProtection, (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
+
+// =======================
 // REGISTER
 // =======================
-app.post("/api/auth/register", async (req, res) => {
+app.post("/api/auth/register", csrfProtection, async (req, res) => {
   try {
     let { email, password } = req.body || {};
 
@@ -75,7 +88,7 @@ app.post("/api/auth/register", async (req, res) => {
 // =======================
 // LOGIN
 // =======================
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", csrfProtection, async (req, res) => {
   try {
     let { email, password } = req.body || {};
 
@@ -106,6 +119,14 @@ app.post("/api/auth/login", async (req, res) => {
     logger.error(`Login error: ${error.message}`);
     res.status(500).json({ msg: "Internal server error" });
   }
+});
+
+app.use((error, req, res, next) => {
+  if (error.code === "EBADCSRFTOKEN") {
+    return res.status(403).json({ msg: "Invalid CSRF token" });
+  }
+
+  return next(error);
 });
 
 // =======================
